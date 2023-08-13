@@ -23,6 +23,6 @@ end
 redis.call("incrby",voucherStockKey,-1)
 -- 5.2 添加订单
 redis.call("sadd",voucherOrderKey,userId)
--- 6. 将订单添加到消息队列 xadd messageQUEUE * k v ...
-redis.call("xadd","stream.orders","*","userId",userId,"voucherId",voucherId,"id",voucherOrderId)
+-- 6. 将订单添加到消息队列 xadd messageQUEUE * k v ...     这里使用rabbitmq作为消息队列
+-- redis.call("xadd","stream.orders","*","userId",userId,"voucherId",voucherId,"id",voucherOrderId)
 return 0

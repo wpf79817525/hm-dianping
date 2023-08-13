@@ -1,5 +1,6 @@
 package com.hmdp.service.impl;
 
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.hmdp.dto.Result;
@@ -11,13 +12,11 @@ import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.hmdp.utils.ILock;
-import com.hmdp.utils.RedisIdWorker;
-import com.hmdp.utils.SimpleRedisLock;
-import com.hmdp.utils.UserHolder;
+import com.hmdp.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -67,8 +66,11 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     }
 
     private IVoucherOrderService proxy;
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
     // TODO 可以使用RabbitMQ进行处理
+    /*
     @PostConstruct
     public void init() {
         new Thread(() -> {
@@ -132,6 +134,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             }
         }).start();
     }
+     */
     //抢购限时优惠券
 //    @Override
 //    public Result buySeckillVoucher(Long voucherId) throws InterruptedException {
@@ -182,7 +185,14 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         if (result != 0)
             return Result.fail(result == 1 ? "库存不足...":"请勿重复下单!!!");
 
-        // 2. 交给异步线程(尝试从消息队列取消息——订单)去操作数据库
+        VoucherOrder voucherOrder = new VoucherOrder();
+        voucherOrder.setVoucherId(voucherId);
+        voucherOrder.setId(orderId);
+        voucherOrder.setUserId(userId);
+        String orderStr = JSONUtil.toJsonStr(voucherOrder);
+        //TODO 将订单消息存到消息队列
+        rabbitTemplate.convertAndSend(RabbitMQConstants.ORDER_EXCHANGE_NAME,RabbitMQConstants.ORDER_ROUTING_KEY,orderStr);
+        // 开启代理对象
         proxy = (IVoucherOrderService) AopContext.currentProxy();
 
         return Result.ok(orderId);

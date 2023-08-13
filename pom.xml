@@ -99,7 +99,11 @@
             <artifactId>redisson</artifactId>
             <version>3.13.6</version>
         </dependency>
-
+        <!-- RabbitMQ对应的包       -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
 
     </dependencies>
 
