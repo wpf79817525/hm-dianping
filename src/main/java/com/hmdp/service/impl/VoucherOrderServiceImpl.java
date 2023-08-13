@@ -72,6 +72,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @PostConstruct
     public void init() {
         new Thread(() -> {
+            System.out.println("此处是异步线程，进行订单处理，预计使用rabbitmq来进行实现修改");
             while (true)
             {
                 try {
