@@ -22,14 +22,13 @@ public class RabbitMQListener {
         try {
             String orderStr = new String(message.getBody());
             VoucherOrder voucherOrder = JSONUtil.toBean(orderStr, VoucherOrder.class);
-            // 这里需要注意@Transactional注解的方法事务可能会由于catch失效
             voucherOrderService.createSeckillVoucherOrder(voucherOrder);
             // 业务处理成功，返回ACK
             channel.basicAck(deliveryTag,false);
         } catch (Exception e) {
             // 业务出现异常，将消息放到死信队列
             channel.basicNack(deliveryTag,false,false);
-            // 抛出异常保证事务的回滚
+            // 抛出异常保证事务的回滚，这里抛出运行时异常和非运行时异常都可以
             throw new OrderConsumeException("数据库操作订单出现异常...",e);
         }
     }

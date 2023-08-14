@@ -242,7 +242,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             log.error("库存不足...");
             return;
         }
-        // 手动创建异常，查看事务是否生效
+        // 手动创建运行时异常，查看事务是否生效
 //        int i = 1 / 0;
         // 2. 保存订单
         save(voucherOrder);
