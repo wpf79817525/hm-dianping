@@ -16,6 +16,7 @@ import com.hmdp.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -190,8 +191,32 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         voucherOrder.setId(orderId);
         voucherOrder.setUserId(userId);
         String orderStr = JSONUtil.toJsonStr(voucherOrder);
-        //TODO 将订单消息存到消息队列
-        rabbitTemplate.convertAndSend(RabbitMQConstants.ORDER_EXCHANGE_NAME,RabbitMQConstants.ORDER_ROUTING_KEY,orderStr);
+        //TODO 将订单消息存到消息队列(新增confirm和returns保证消息投递的可靠性)
+        rabbitTemplate.setReturnsCallback(returnedMessage -> {
+            log.error("消息从交换机投递到消息队列失败，请检查对应的路由...");
+            log.error("Message:" + new String(returnedMessage.getMessage().getBody()));
+            log.error("Exchange:" + returnedMessage.getExchange());
+            log.error("RoutingKey:" + returnedMessage.getRoutingKey());
+            log.error("ReplyCode:" + returnedMessage.getReplyCode());
+            log.error("ReplyText:" + returnedMessage.getReplyText());
+            // 在这里会将对应的消息发送到死信队列当中，保证消息投递可靠性
+            rabbitTemplate.convertAndSend(RabbitMQConstants.DEAD_ORDER_EXCHANGE_NAME,RabbitMQConstants.DEAD_ORDER_ROUTING_KEY,orderStr);
+        });
+
+        // 给消息设置唯一ID
+        CorrelationData correlationData = new CorrelationData(Long.toString(orderId));
+        rabbitTemplate.setConfirmCallback((correlationData1,ack,cause) -> {
+            // 消息未成功发送到交换机
+            if (!ack)
+            {
+                log.error("消息发送到交换机失败...");
+                log.error("订单ID:" + correlationData1.getId());
+                log.error("失败原因:" + cause);
+                // 在这里会将对应的消息发送到死信队列当中，保证消息投递可靠性
+                rabbitTemplate.convertAndSend(RabbitMQConstants.DEAD_ORDER_EXCHANGE_NAME,RabbitMQConstants.DEAD_ORDER_ROUTING_KEY,orderStr);
+            }
+        });
+        rabbitTemplate.convertAndSend(RabbitMQConstants.ORDER_EXCHANGE_NAME,RabbitMQConstants.ORDER_ROUTING_KEY,orderStr,correlationData);
         // 开启代理对象
         proxy = (IVoucherOrderService) AopContext.currentProxy();
 
